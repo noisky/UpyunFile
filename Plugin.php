@@ -1,10 +1,10 @@
 <?php
 /**
- * 又拍云（UpYun）文件管理
+ * 又拍云（UpYun）文件管理 Mod by <a href="http://blog.iplayloli.com/">Ryan</a>
  * 
  * @package UpyunFile
  * @author codesee
- * @version 0.8.0
+ * @version 0.8.1
  * @link http://pengzhiyong.com
  * @dependence 1.0-*
  * @date 2015-12-26
@@ -29,6 +29,7 @@ class UpyunFile_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('Widget_Upload')->deleteHandle = array('UpyunFile_Plugin', 'deleteHandle');
         Typecho_Plugin::factory('Widget_Upload')->attachmentHandle = array('UpyunFile_Plugin', 'attachmentHandle');
         Typecho_Plugin::factory('Widget_Upload')->attachmentDataHandle = array('UpyunFile_Plugin', 'attachmentDataHandle');
+		Typecho_Plugin::factory('Widget_Abstract_Contents')->contentEx = array('UpyunFile_Plugin','replace');
 		return _t('插件已经激活，请正确设置插件');
     }
     
@@ -53,6 +54,8 @@ class UpyunFile_Plugin implements Typecho_Plugin_Interface
      */
     public static function config(Typecho_Widget_Helper_Form $form)
     {
+		$convert =  new Typecho_Widget_Helper_Form_Element_Radio('convert' , array('1'=>_t('开启'),'0'=>_t('关闭')),'0',_t('图片链接修改'),_t('把文章中图片的链接修改为又拍云 CDN 链接，启用前请把放在 typecho 上传目录中的图片同步到又拍云中'));
+		$form->addInput($convert);
 		$upyundomain = new Typecho_Widget_Helper_Form_Element_Text('upyundomain', NULL, 'http://', _t('绑定域名：'), _t('该绑定域名为绑定Upyun服务的域名，由Upyun提供，注意以http://开头，最后不要加/'));
 		$form->addInput($upyundomain->addRule('required',_t('您必须填写绑定域名，它是由Upyun提供')));
 		
@@ -682,5 +685,35 @@ class UpyunFile_Plugin implements Typecho_Plugin_Interface
         }
 
         return 'application/octet-stream';
+	}
+	/**
+	 * 图片链接软修改
+	 *
+	 * @access public
+	 * @param $content
+	 * @param $class
+	 * @return $content
+	 */
+	public static function replace($text, $widget, $lastResult) {
+		if(Typecho_Widget::widget('Widget_Options')->Plugin('UpyunFile')->convert == 1)  {
+			$text = empty($lastResult) ? $text : $lastResult;
+			if (($widget instanceof Widget_Archive)||($widget instanceof Widget_Abstract_Comments)) {
+				$options = Typecho_Widget::widget('Widget_Options');
+				$settings = $options->plugin('UpyunFile');
+				preg_match_all('/<img[^>]*src=[\'"]?([^>\'"\s]*)[\'"]?[^>]*>/i',$text,$matches);
+				if($matches){
+					foreach($matches[1] as $val){
+						if(strpos($val,rtrim($options->siteUrl, '/')) !== false) {
+							if($settings->mode !== 'typecho'){
+								$text=str_replace(rtrim($options->siteUrl, '/') . '/usr/uploads', $settings->upyundomain . '/usr/uploads', $text);
+							} else {
+								$text=str_replace(rtrim($options->siteUrl, '/') . '/usr/uploads', $settings->upyundomain, $text);
+							}
+						}
+					}
+				}
+			}
+		}
+		return $text;
 	}
 }
